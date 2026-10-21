@@ -327,6 +327,9 @@ assíncronos), `Nullable` habilitado e documentação XML em todos os membros p�
 
 | Nome | RM |
 |---|---|
-| _preencher_ | _preencher_ |
+| Felipe Braunstein e Silva | RM554483 |
+| Felipe do Nascimento Fernandes | RM554598 |
+| Henrique Ignacio Bartalo | RM555274 |
+| Gustavo Henrique Martins | RM556956 |
 
 Entrega: **27 de outubro de 2026**.
