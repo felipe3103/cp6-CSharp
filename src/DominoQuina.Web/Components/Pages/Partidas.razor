@@ -1,0 +1,286 @@
+@page "/partidas"
+@implements IDisposable
+@inject ServicoConta Conta
+@inject DominoApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Partidas · Dominó Ponta de Quina</PageTitle>
+
+<div class="container-fluid px-3 px-lg-4 py-4">
+    @if (_mensagem is not null)
+    {
+        <div class="alert @(_erro ? "alert-danger" : "alert-info") d-flex gap-2">
+            <i class="bi @(_erro ? "bi-exclamation-octagon" : "bi-info-circle")"></i>
+            <div>@_mensagem</div>
+        </div>
+    }
+
+    <div class="row g-4">
+        @* Lista de mesas *@
+        <div class="col-lg-4 col-xl-3">
+            <div class="card cartao h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h2 class="h3 fw-bold mb-0">Partidas</h2>
+                            <p class="text-secondary small">Escolha uma mesa e jogue</p>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="Carregar" title="Atualizar">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+
+                    @if (_carregando && _partidas.Count == 0)
+                    {
+                        <div class="text-center py-5"><span class="spinner-border text-primary"></span></div>
+                    }
+                    else if (_partidas.Count == 0)
+                    {
+                        <div class="text-secondary small py-4 text-center">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                            Nenhuma mesa aberta. Crie uma ao lado.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-grid gap-2 lista-mesas">
+                            @foreach (var partida in _partidas)
+                            {
+                                var selecionada = _selecionada?.Identificador == partida.Identificador;
+                                <button class="item-mesa @(selecionada ? "ativa" : "")" @onclick="() => _selecionada = partida">
+                                    <i class="bi bi-people-fill"></i>
+                                    <span>@partida.Ocupacao/2</span>
+                                    <span class="separador"></span>
+                                    <span class="flex-grow-1 text-start">Até @partida.PontuacaoAlvo</span>
+                                    <i class="bi bi-chevron-right"></i>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* Prévia da mesa *@
+        <div class="col-lg-5 col-xl-6 d-none d-lg-block">
+            <div class="mesa-previa h-100">
+                <div class="feltro-previa">
+                    <div class="assento-vazio">
+                        <i class="bi bi-person"></i>
+                        <span>@(_selecionada is null ? "Escolha uma mesa" : _selecionada.Ocupacao >= 2 ? "Mesa cheia" : "Aguardando jogador")</span>
+                    </div>
+                    <div class="d-flex justify-content-center align-items-center gap-1 my-4">
+                        <PedraDomino Valor="new Pedra(1, 3)" Tamanho="p" />
+                        <PedraDomino Valor="new Pedra(3, 3)" Tamanho="p" Vertical="true" />
+                        <PedraDomino Valor="new Pedra(3, 5)" Tamanho="p" />
+                        <PedraDomino Valor="new Pedra(5, 6)" Tamanho="p" />
+                    </div>
+                    <div class="d-flex justify-content-center gap-1">
+                        @for (var i = 0; i < 7; i++)
+                        {
+                            <PedraDomino Oculta="true" Vertical="true" Tamanho="p" />
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Perfil e ações *@
+        <div class="col-lg-3">
+            <div class="card cartao mb-4">
+                <div class="card-body text-center">
+                    <div class="avatar grande mx-auto mb-2">@Inicial</div>
+                    <div class="fs-5 fw-semibold">@(Conta.PerfilAtivo?.Nome ?? "Sem perfil")</div>
+                    <div class="small text-secondary mb-3">@(_perfilPronto ? "Pronto para jogar" : "Confirmando ativação…")</div>
+                    <hr />
+                    <div class="text-start small text-secondary mb-2">Mesa selecionada</div>
+                    @if (_selecionada is { } mesa)
+                    {
+                        <div class="d-flex align-items-center gap-3 mb-2"><i class="bi bi-people-fill fs-5"></i>@mesa.Ocupacao/2</div>
+                        <div class="d-flex align-items-center gap-3 mb-3"><i class="bi bi-bullseye fs-5"></i>Até @mesa.PontuacaoAlvo</div>
+                        <button class="btn btn-primary btn-lg w-100" @onclick="Entrar" disabled="@(_ocupado || !_perfilPronto)">
+                            Entrar na partida <i class="bi bi-chevron-right"></i>
+                        </button>
+                        <button class="btn btn-link btn-sm mt-1" @onclick="() => Abrir(mesa.Identificador)">Já participo: abrir mesa</button>
+                    }
+                    else
+                    {
+                        <p class="text-secondary small mb-0">Nenhuma mesa selecionada.</p>
+                    }
+                </div>
+            </div>
+
+            <div class="card cartao mb-4">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-plus-circle me-2 text-primary"></i>Criar mesa</h6>
+                    <div class="small text-secondary mb-2">Pontuação alvo</div>
+                    <div class="btn-group w-100 mb-3" role="group">
+                        @foreach (var alvo in AlvosSugeridos)
+                        {
+                            <button class="btn @(_alvo == alvo ? "btn-primary" : "btn-outline-primary")" @onclick="() => _alvo = alvo">@alvo</button>
+                        }
+                    </div>
+                    <button class="btn btn-outline-light w-100" @onclick="Criar" disabled="@(_ocupado || !_perfilPronto)">
+                        <i class="bi bi-table me-1"></i>Criar mesa até @_alvo
+                    </button>
+                </div>
+            </div>
+
+            <div class="card cartao">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-arrow-repeat me-2 text-primary"></i>Retomar partida</h6>
+                    @if (Conta.PartidaAtualId is { } ultima)
+                    {
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" @onclick="() => Abrir(ultima)">Última: @Curto(ultima)</button>
+                    }
+                    <div class="input-group input-group-sm">
+                        <input class="form-control font-monospace" placeholder="ID da partida" @bind="_idRetomar" />
+                        <button class="btn btn-outline-secondary" @onclick="() => Abrir(_idRetomar)" disabled="@string.IsNullOrWhiteSpace(_idRetomar)">Abrir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly int[] AlvosSugeridos = [50, 100, 150];
+
+    private readonly CancellationTokenSource _cts = new();
+    private IReadOnlyList<PartidaResumoDto> _partidas = [];
+    private PartidaResumoDto? _selecionada;
+    private int _alvo = 50;
+    private string _idRetomar = "";
+    private string? _mensagem;
+    private bool _erro;
+    private bool _ocupado;
+    private bool _carregando = true;
+    private bool _perfilPronto;
+
+    private string Inicial => Conta.PerfilAtivo?.Nome is { Length: > 0 } nome ? nome[..1].ToUpperInvariant() : "?";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Conta.Autenticado)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        if (Conta.PerfilAtivo is null)
+        {
+            Nav.NavigateTo("/perfis");
+            return;
+        }
+
+        try
+        {
+            // Ao reabrir o app, repete a ativação com a mesma chave (a API reconhece).
+            await Conta.GarantirAtivacaoAsync(_cts.Token);
+            _perfilPronto = true;
+        }
+        catch (Exception ex)
+        {
+            Mostrar(Erros.Descrever(ex), erro: true);
+        }
+
+        await Carregar();
+        _ = AtualizarPeriodicamenteAsync(_cts.Token);
+    }
+
+    private async Task AtualizarPeriodicamenteAsync(CancellationToken ct)
+    {
+        using var temporizador = new PeriodicTimer(TimeSpan.FromSeconds(4));
+        try
+        {
+            while (await temporizador.WaitForNextTickAsync(ct))
+            {
+                await InvokeAsync(Carregar);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Página fechada.
+        }
+    }
+
+    private async Task Carregar()
+    {
+        try
+        {
+            _partidas = await Api.ListarPartidasAsync(Conta.PerfilAtivo, _cts.Token);
+            if (_selecionada is not null)
+                _selecionada = _partidas.FirstOrDefault(p => p.Identificador == _selecionada.Identificador);
+        }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            Mostrar(Erros.Descrever(ex), erro: true);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task Criar()
+    {
+        if (Conta.PerfilAtivo is not { } perfil) return;
+        await Executar(async () =>
+        {
+            var id = await Api.CriarPartidaAsync(perfil, _alvo, _cts.Token);
+            Abrir(id);
+        });
+    }
+
+    private async Task Entrar()
+    {
+        if (Conta.PerfilAtivo is not { } perfil || _selecionada is not { } mesa) return;
+        await Executar(async () =>
+        {
+            // A vaga é revalidada pela API na hora do ingresso.
+            await Api.EntrarPartidaAsync(perfil, mesa.Identificador, _cts.Token);
+            Abrir(mesa.Identificador);
+        });
+    }
+
+    private void Abrir(string? partidaId)
+    {
+        if (string.IsNullOrWhiteSpace(partidaId)) return;
+        Conta.LembrarPartida(partidaId.Trim());
+        Nav.NavigateTo($"/jogo/{Uri.EscapeDataString(partidaId.Trim())}");
+    }
+
+    private async Task Executar(Func<Task> acao)
+    {
+        _ocupado = true;
+        _mensagem = null;
+        try
+        {
+            await acao();
+        }
+        catch (Exception ex)
+        {
+            Mostrar(Erros.Descrever(ex), erro: true);
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private void Mostrar(string mensagem, bool erro)
+    {
+        _mensagem = mensagem;
+        _erro = erro;
+    }
+
+    private static string Curto(string id) => id.Length > 13 ? id[..8] + "…" : id;
+
+    public void Dispose() => _cts.Cancel();
+}

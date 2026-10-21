@@ -1,0 +1,56 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject ServicoConta Conta
+
+<nav class="navbar navbar-expand-md barra sticky-top">
+    <div class="container-fluid px-3 px-lg-4">
+        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+            <span class="marca-pedra"><i></i><i></i></span>
+            <span>Dominó <strong class="text-primary">Ponta de Quina</strong></span>
+        </a>
+        <button class="navbar-toggler" type="button" @onclick="() => _menuAberto = !_menuAberto" aria-label="Abrir menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse @(_menuAberto ? "show" : "")">
+            <ul class="navbar-nav me-auto ms-md-4">
+                <li class="nav-item"><NavLink class="nav-link" href="/" Match="NavLinkMatch.All"><i class="bi bi-key me-1"></i>Acesso</NavLink></li>
+                <li class="nav-item"><NavLink class="nav-link" href="/perfis"><i class="bi bi-person-badge me-1"></i>Perfis</NavLink></li>
+                <li class="nav-item"><NavLink class="nav-link" href="/partidas"><i class="bi bi-grid-3x2-gap me-1"></i>Partidas</NavLink></li>
+            </ul>
+            @if (Conta.PerfilAtivo is { } perfil)
+            {
+                <span class="badge rounded-pill text-bg-primary px-3 py-2" title="Perfil ativo neste cliente">
+                    <i class="bi bi-person-check-fill me-1"></i>@perfil.Nome
+                </span>
+            }
+            else if (Conta.Autenticado)
+            {
+                <span class="badge rounded-pill text-bg-secondary px-3 py-2"><i class="bi bi-person-dash me-1"></i>Sem perfil ativo</span>
+            }
+            else
+            {
+                <span class="badge rounded-pill text-bg-dark border px-3 py-2"><i class="bi bi-lock me-1"></i>Não autenticado</span>
+            }
+        </div>
+    </div>
+</nav>
+
+<main>
+    @Body
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ocorreu um erro inesperado.
+    <a href="." class="reload">Recarregar</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool _menuAberto;
+
+    protected override void OnInitialized() => Conta.Alterado += Atualizar;
+
+    private void Atualizar() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Conta.Alterado -= Atualizar;
+}

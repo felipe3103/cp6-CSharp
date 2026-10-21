@@ -1,0 +1,72 @@
+@* Desenha uma pedra de dominó com os pontos (pips) de cada metade. *@
+
+<div class="pedra @(Vertical ? "vertical" : "horizontal") @Tamanho @(Oculta ? "oculta" : "") @(Clicavel ? "clicavel" : "") @(Selecionada ? "selecionada" : "") @(Destaque ? "destaque" : "") @(Apagada ? "apagada" : "")"
+     role="@(Clicavel ? "button" : null)"
+     tabindex="@(Clicavel ? 0 : null)"
+     title="@(Titulo ?? (Oculta ? "Pedra do adversário" : Valor.ToString()))"
+     @onclick="Clicar"
+     @onkeydown="Teclar">
+    @if (!Oculta)
+    {
+        <span class="metade">@Pontos(Valor.ValorA)</span>
+        <span class="divisor"></span>
+        <span class="metade">@Pontos(Valor.ValorB)</span>
+    }
+</div>
+
+@code {
+    /// <summary>Pedra exibida.</summary>
+    [Parameter] public Pedra Valor { get; set; }
+
+    /// <summary>Desenha em pé (usado para duplas na mesa e para a mão).</summary>
+    [Parameter] public bool Vertical { get; set; }
+
+    /// <summary>Mostra só o verso (pedras do adversário).</summary>
+    [Parameter] public bool Oculta { get; set; }
+
+    /// <summary>Permite clicar na pedra.</summary>
+    [Parameter] public bool Clicavel { get; set; }
+
+    /// <summary>Marca a pedra escolhida.</summary>
+    [Parameter] public bool Selecionada { get; set; }
+
+    /// <summary>Realça a pedra (pontas da mesa, abertura obrigatória).</summary>
+    [Parameter] public bool Destaque { get; set; }
+
+    /// <summary>Esmaece a pedra (não encaixa).</summary>
+    [Parameter] public bool Apagada { get; set; }
+
+    /// <summary>Classe de tamanho: <c>p</c>, <c>m</c> ou <c>g</c>.</summary>
+    [Parameter] public string Tamanho { get; set; } = "m";
+
+    /// <summary>Texto de dica.</summary>
+    [Parameter] public string? Titulo { get; set; }
+
+    /// <summary>Clique na pedra.</summary>
+    [Parameter] public EventCallback<Pedra> AoClicar { get; set; }
+
+    // Posições acesas numa grade 3x3 (0 = canto superior esquerdo, 8 = inferior direito).
+    private static readonly int[][] Posicoes =
+    [
+        [],
+        [4],
+        [0, 8],
+        [0, 4, 8],
+        [0, 2, 6, 8],
+        [0, 2, 4, 6, 8],
+        [0, 2, 3, 5, 6, 8],
+    ];
+
+    private RenderFragment Pontos(int valor) => __builder =>
+    {
+        var acesos = valor is >= 0 and <= 6 ? Posicoes[valor] : [];
+        for (var i = 0; i < 9; i++)
+        {
+            <i class="@(acesos.Contains(i) ? "pip" : null)"></i>
+        }
+    };
+
+    private Task Clicar() => Clicavel ? AoClicar.InvokeAsync(Valor) : Task.CompletedTask;
+
+    private Task Teclar(KeyboardEventArgs e) => e.Key is "Enter" or " " ? Clicar() : Task.CompletedTask;
+}

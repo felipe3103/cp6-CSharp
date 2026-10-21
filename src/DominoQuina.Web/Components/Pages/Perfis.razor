@@ -1,0 +1,192 @@
+@page "/perfis"
+@inject ServicoConta Conta
+@inject NavigationManager Nav
+
+<PageTitle>Perfis · Dominó Ponta de Quina</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
+        <div>
+            <h1 class="h2 fw-bold mb-1">Jogadores-perfil</h1>
+            <p class="text-secondary mb-0">Escolha um perfil da sua conta e ative-o neste cliente.</p>
+        </div>
+        <button class="btn btn-outline-secondary" @onclick="Carregar" disabled="@_ocupado">
+            <i class="bi bi-arrow-clockwise"></i> Atualizar
+        </button>
+    </div>
+
+    @if (_mensagem is not null)
+    {
+        <div class="alert @(_erro ? "alert-danger" : "alert-success") d-flex gap-2">
+            <i class="bi @(_erro ? "bi-exclamation-octagon" : "bi-check-circle")"></i>
+            <div>@_mensagem</div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card cartao mb-4">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-person-check me-2 text-primary"></i>Perfil ativo neste cliente</h5>
+                    @if (Conta.PerfilAtivo is { } perfil)
+                    {
+                        <div class="d-flex align-items-center gap-3 my-3">
+                            <div class="avatar">@Inicial(perfil.Nome)</div>
+                            <div>
+                                <div class="fs-5 fw-semibold">@perfil.Nome</div>
+                                <div class="small text-secondary font-monospace">@perfil.JogadorId</div>
+                                <div class="small text-secondary">Chave: <span class="font-monospace">@perfil.ChaveAtivacao[..8]…</span></div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a class="btn btn-primary" href="/partidas"><i class="bi bi-grid-3x2-gap me-1"></i>Ir para partidas</a>
+                            <button class="btn btn-outline-danger" @onclick="Desativar" disabled="@_ocupado">
+                                <i class="bi bi-box-arrow-right me-1"></i>Liberar perfil
+                            </button>
+                        </div>
+                        <p class="small text-secondary mt-3 mb-0">
+                            Fechar o app não libera o perfil. Use <em>Liberar perfil</em> antes de ativá-lo em outro cliente.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="text-secondary mb-0">Nenhum perfil ativo. Ative um perfil da lista.</p>
+                    }
+                </div>
+            </div>
+
+            <div class="card cartao">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-person-plus me-2 text-primary"></i>Novo perfil</h5>
+                    <form @onsubmit="Criar" @onsubmit:preventDefault>
+                        <div class="input-group">
+                            <input class="form-control" placeholder="Nome do perfil" @bind="_novoNome" maxlength="40" required />
+                            <button class="btn btn-primary" disabled="@_ocupado">Criar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card cartao">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-people me-2"></i>Seus perfis</span>
+                    <span class="badge text-bg-secondary">@_jogadores.Count</span>
+                </div>
+                @if (_carregando)
+                {
+                    <div class="card-body text-center py-5"><span class="spinner-border text-primary"></span></div>
+                }
+                else if (_jogadores.Count == 0)
+                {
+                    <div class="card-body text-secondary">Nenhum perfil encontrado. Crie o primeiro ao lado.</div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var jogador in _jogadores)
+                        {
+                            var ativo = Conta.PerfilAtivo?.JogadorId == jogador.Identificador;
+                            <li class="list-group-item d-flex align-items-center gap-3 py-3">
+                                <div class="avatar pequeno">@Inicial(jogador.NomeExibicao)</div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">@jogador.NomeExibicao</div>
+                                    <div class="small text-secondary font-monospace">@jogador.Identificador</div>
+                                </div>
+                                @if (ativo)
+                                {
+                                    <span class="badge text-bg-success"><i class="bi bi-check2"></i> Ativo</span>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => Ativar(jogador)" disabled="@_ocupado">
+                                        Ativar neste cliente
+                                    </button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<JogadorDto> _jogadores = [];
+    private string _novoNome = "";
+    private string? _mensagem;
+    private bool _erro;
+    private bool _ocupado;
+    private bool _carregando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Conta.Autenticado)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        _carregando = true;
+        await Executar(async () => _jogadores = await Conta.ListarJogadoresAsync());
+        _carregando = false;
+    }
+
+    private Task Criar() => Executar(async () =>
+    {
+        var criado = await Conta.CriarJogadorAsync(_novoNome);
+        _novoNome = "";
+        _jogadores = await Conta.ListarJogadoresAsync();
+        Mostrar($"Perfil {criado.NomeExibicao} criado.", erro: false);
+    });
+
+    private Task Ativar(JogadorDto jogador) => Executar(async () =>
+    {
+        await Conta.AtivarAsync(jogador.Identificador, jogador.NomeExibicao);
+        Mostrar($"Perfil {jogador.NomeExibicao} ativado neste cliente.", erro: false);
+    });
+
+    private Task Desativar() => Executar(async () =>
+    {
+        await Conta.DesativarAsync();
+        Mostrar("Perfil liberado. Ele já pode ser ativado em outro cliente.", erro: false);
+    });
+
+    private async Task Executar(Func<Task> acao)
+    {
+        _ocupado = true;
+        _mensagem = null;
+        try
+        {
+            await acao();
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Mostrar(ex.MensagemParaUsuario, erro: true);
+            Conta.Sair();
+        }
+        catch (Exception ex)
+        {
+            Mostrar(Erros.Descrever(ex), erro: true);
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private void Mostrar(string mensagem, bool erro)
+    {
+        _mensagem = mensagem;
+        _erro = erro;
+    }
+
+    private static string Inicial(string nome) => string.IsNullOrWhiteSpace(nome) ? "?" : nome.Trim()[..1].ToUpperInvariant();
+}

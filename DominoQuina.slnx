@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DominoQuina.Bot/DominoQuina.Bot.csproj" />
+    <Project Path="src/DominoQuina.Core/DominoQuina.Core.csproj" />
+    <Project Path="src/DominoQuina.Web/DominoQuina.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DominoQuina.Tests/DominoQuina.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/DominoQuina.Simulador/DominoQuina.Simulador.csproj" />
+  </Folder>
+</Solution>

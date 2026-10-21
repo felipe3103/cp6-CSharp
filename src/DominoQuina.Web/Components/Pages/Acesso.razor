@@ -1,0 +1,155 @@
+@page "/"
+@inject ServicoConta Conta
+@inject NavigationManager Nav
+
+<PageTitle>Acesso · Dominó Ponta de Quina</PageTitle>
+
+<div class="container py-4 py-lg-5">
+    <div class="row align-items-center g-4 mb-4">
+        <div class="col-lg-7">
+            <span class="badge text-bg-primary mb-2">FIAP · Checkpoint 6</span>
+            <h1 class="display-5 fw-bold">Bem-vindo à mesa.</h1>
+            <p class="lead text-secondary mb-0">
+                Peça o token pelo seu e-mail FIAP, escolha um jogador-perfil e jogue partidas de dominó
+                ponta de quina, manualmente ou com o jogador autônomo.
+            </p>
+        </div>
+        <div class="col-lg-5 d-none d-lg-flex justify-content-center gap-2 vitrine">
+            <PedraDomino Valor="new Pedra(5, 5)" Vertical="true" Tamanho="g" />
+            <PedraDomino Valor="new Pedra(5, 0)" Tamanho="g" />
+            <PedraDomino Valor="new Pedra(0, 5)" Tamanho="g" Destaque="true" />
+        </div>
+    </div>
+
+    @if (_mensagem is not null)
+    {
+        <div class="alert @(_erro ? "alert-danger" : "alert-success") d-flex gap-2" role="alert">
+            <i class="bi @(_erro ? "bi-exclamation-octagon" : "bi-check-circle")"></i>
+            <div>@_mensagem</div>
+        </div>
+    }
+
+    @if (Conta.Autenticado)
+    {
+        <div class="card cartao mb-4">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-center gap-3">
+                <i class="bi bi-shield-check fs-1 text-success"></i>
+                <div class="flex-grow-1">
+                    <h5 class="card-title mb-1">Você já tem um token salvo neste computador</h5>
+                    <p class="card-text text-secondary mb-0">
+                        @(Conta.Email is null ? "O token é reutilizado até ser revogado." : $"Conta: {Conta.Email}. O token é reutilizado até ser revogado.")
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-primary" href="/perfis">Continuar <i class="bi bi-arrow-right"></i></a>
+                    <button class="btn btn-outline-secondary" @onclick="Sair">Sair</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card cartao h-100">
+                <div class="card-body">
+                    <div class="passo">1</div>
+                    <h5 class="card-title">Solicitar token</h5>
+                    <p class="text-secondary small">
+                        A primeira solicitação cria a conta. A API responde <code>202 Accepted</code> e envia o token
+                        para o e-mail informado.
+                    </p>
+                    <form @onsubmit="SolicitarToken" @onsubmit:preventDefault>
+                        <div class="form-floating mb-3">
+                            <input id="email" type="email" class="form-control" placeholder="aluno@fiap.com.br"
+                                   @bind="_email" autocomplete="email" required />
+                            <label for="email">E-mail FIAP</label>
+                        </div>
+                        <button class="btn btn-primary w-100" disabled="@_ocupado">
+                            @if (_ocupado) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            <i class="bi bi-envelope-paper me-1"></i> Enviar token por e-mail
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card cartao h-100">
+                <div class="card-body">
+                    <div class="passo">2</div>
+                    <h5 class="card-title">Informar o token recebido</h5>
+                    <p class="text-secondary small">
+                        Cole o token do e-mail. Ele é validado na API e guardado só neste computador, com acesso restrito ao seu usuário.
+                    </p>
+                    <form @onsubmit="DefinirToken" @onsubmit:preventDefault>
+                        <div class="form-floating mb-3">
+                            <textarea id="token" class="form-control font-monospace campo-token" placeholder="token"
+                                      @bind="_token" required></textarea>
+                            <label for="token">Token</label>
+                        </div>
+                        <button class="btn btn-outline-primary w-100" disabled="@_ocupado">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Entrar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _email = "";
+    private string _token = "";
+    private string? _mensagem;
+    private bool _erro;
+    private bool _ocupado;
+
+    protected override void OnInitialized() => _email = Conta.Email ?? "";
+
+    private async Task SolicitarToken()
+    {
+        await Executar(async () =>
+        {
+            await Conta.SolicitarTokenAsync(_email);
+            Mostrar($"Pedido aceito. Verifique a caixa de entrada de {_email.Trim()} e cole o token ao lado.", erro: false);
+        });
+    }
+
+    private async Task DefinirToken()
+    {
+        await Executar(async () =>
+        {
+            await Conta.DefinirTokenAsync(_token);
+            Nav.NavigateTo("/perfis");
+        });
+    }
+
+    private void Sair()
+    {
+        Conta.Sair();
+        Mostrar("Token removido deste computador.", erro: false);
+    }
+
+    private async Task Executar(Func<Task> acao)
+    {
+        _ocupado = true;
+        _mensagem = null;
+        try
+        {
+            await acao();
+        }
+        catch (Exception ex)
+        {
+            Mostrar(Erros.Descrever(ex), erro: true);
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private void Mostrar(string mensagem, bool erro)
+    {
+        _mensagem = mensagem;
+        _erro = erro;
+    }
+}

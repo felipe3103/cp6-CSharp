@@ -1,0 +1,40 @@
+@* Relógio do turno: segundos desde que a vez chegou e desconto previsto pela regra de demora. *@
+
+<div class="relogio @Classe" title="Tempo desde que a vez chegou. Desconto previsto: @Desconto ponto(s).">
+    <svg viewBox="0 0 44 44" aria-hidden="true">
+        <circle class="trilho" cx="22" cy="22" r="19" />
+        <circle class="progresso" cx="22" cy="22" r="19"
+                stroke-dasharray="@Circunferencia.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                stroke-dashoffset="@Deslocamento.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" />
+    </svg>
+    <span class="segundos">@(Ativo ? ((int)Decorrido.TotalSeconds).ToString() : "–")</span>
+</div>
+@if (Ativo)
+{
+    <div class="small text-center mt-1 @(Desconto == 0 ? "text-success" : "text-warning")">
+        @(Desconto == 0 ? "sem desconto" : $"−{Desconto} pt")
+    </div>
+}
+
+@code {
+    private const double Circunferencia = 2 * Math.PI * 19;
+
+    /// <summary>Indica se é a vez deste participante.</summary>
+    [Parameter] public bool Ativo { get; set; }
+
+    /// <summary>Tempo desde que a vez chegou.</summary>
+    [Parameter] public TimeSpan Decorrido { get; set; }
+
+    private int Desconto => RegrasDomino.DescontoPorDemora(Decorrido);
+
+    private double Deslocamento => Ativo
+        ? Circunferencia * (1 - Math.Min(Decorrido.TotalSeconds, 60) / 60)
+        : Circunferencia;
+
+    private string Classe => !Ativo ? "inativo" : Desconto switch
+    {
+        0 => "ok",
+        1 => "atencao",
+        _ => "critico",
+    };
+}
